@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>NutriAI — Piano pasti personalizzato</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f9f8f5;
+      --surface: #ffffff;
+      --border: rgba(0,0,0,0.1);
+      --border-strong: rgba(0,0,0,0.2);
+      --text: #1a1a1a;
+      --text-muted: #666;
+      --text-hint: #999;
+      --green: #1D9E75;
+      --blue: #378ADD;
+      --orange: #EF9F27;
+      --red: #D85A30;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app { max-width: 480px; margin: 0 auto; padding: 0 0 4rem; }
+
+    /* Header */
+    .app-header {
+      padding: 1.5rem 1.25rem 1rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .app-logo { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+    .app-logo span { color: var(--green); }
+
+    /* Steps nav */
+    .steps-nav { display: flex; gap: 4px; padding: 0 1.25rem 1.25rem; }
+    .step-dot { flex: 1; height: 3px; border-radius: 2px; background: var(--border); transition: background .3s; }
+    .step-dot.active { background: var(--text); }
+
+    /* Step */
+    .step { display: none; animation: fadeIn .2s ease; }
+    .step.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    .step-header { padding: 0 1.25rem 1.25rem; }
+    .step-eyebrow { font-size: 11px; font-weight: 600; color: var(--text-hint); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+    .step-title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+    .step-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin: 0 1rem .75rem;
+    }
+    .card.surface { background: var(--bg); border-color: transparent; }
+
+    .field-label { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; display: block; }
+
+    /* Slider */
+    .slider-row { display: flex; align-items: center; gap: 12px; }
+    input[type=range] {
+      flex: 1; -webkit-appearance: none; height: 4px;
+      background: var(--border-strong); border-radius: 2px; outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 20px; height: 20px;
+      border-radius: 50%; background: var(--text); cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    }
+    .slider-val { font-size: 14px; font-weight: 600; min-width: 80px; text-align: right; }
+
+    /* Segmented */
+    .seg { display: flex; background: var(--bg); border-radius: var(--radius-sm); padding: 3px; gap: 2px; }
+    .seg-btn {
+      flex: 1; padding: 7px 6px; font-size: 12px; font-weight: 600;
+      background: transparent; border: none; border-radius: 6px;
+      cursor: pointer; color: var(--text-muted); transition: all .15s;
+    }
+    .seg-btn.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+
+    /* Tags */
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .tag {
+      padding: 6px 14px; font-size: 13px; font-weight: 500;
+      border: 1px solid var(--border-strong); border-radius: 999px;
+      cursor: pointer; color: var(--text-muted); background: transparent; transition: all .15s;
+    }
+    .tag.on { background: var(--text); color: #fff; border-color: var(--text); }
+
+    /* Macro grid */
+    .macro-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .mc { background: var(--bg); border-radius: var(--radius-sm); padding: 12px 8px; text-align: center; }
+    .mc-label { font-size: 10px; font-weight: 700; color: var(--text-hint); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+    .mc-num { font-size: 22px; font-weight: 700; }
+    .mc-unit { font-size: 11px; color: var(--text-muted); }
+
+    /* TDEE display */
+    .kcal-display { text-align: center; padding: .5rem 0; }
+    .kcal-num { font-size: 42px; font-weight: 800; letter-spacing: -1px; }
+    .kcal-lbl { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+    /* Buttons */
+    .btn-primary {
+      display: block; width: calc(100% - 2rem); margin: .75rem 1rem 0;
+      padding: 16px; background: var(--text); color: #fff;
+      border: none; border-radius: var(--radius); font-size: 16px; font-weight: 600;
+      cursor: pointer; transition: opacity .15s; letter-spacing: -0.2px;
+    }
+    .btn-primary:active { opacity: .85; }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-secondary {
+      display: block; width: calc(100% - 2rem); margin: .5rem 1rem 0;
+      padding: 14px; background: transparent; color: var(--text);
+      border: 1px solid var(--border-strong); border-radius: var(--radius);
+      font-size: 15px; font-weight: 500; cursor: pointer;
+    }
+
+    /* Input text */
+    input[type=text] {
+      width: 100%; padding: 10px 12px; font-size: 14px;
+      border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+      background: var(--bg); color: var(--text); outline: none;
+      transition: border-color .15s;
+    }
+    input[type=text]:focus { border-color: var(--text); }
+
+    /* Meal section */
+    .meal-section { margin: 0 1rem 1.25rem; }
+    .meal-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 600; margin-bottom: 10px;
+    }
+    .meal-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .meal-kcal { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+
+    /* Recipe card */
+    .recipe {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem 1.1rem;
+      margin-bottom: 8px; cursor: pointer; transition: border-color .2s;
+      position: relative;
+    }
+    .recipe:active { opacity: .9; }
+    .recipe.selected { border: 2px solid var(--text); }
+    .recipe-name { font-size: 15px; font-weight: 600; padding-right: 58px; margin-bottom: 4px; }
+    .recipe-meta { font-size: 12px; color: var(--text-muted); }
+    .recipe-kcal {
+      position: absolute; top: 12px; right: 12px;
+      font-size: 13px; font-weight: 700; color: var(--text);
+    }
+    .recipe-detail {
+      display: none; margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--border); font-size: 13px;
+      color: var(--text-muted); line-height: 1.6;
+    }
+    .recipe.selected .recipe-detail { display: block; }
+    .recipe-detail strong { color: var(--text); font-weight: 600; }
+
+    /* Loading */
+    .loading-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 1rem; font-size: 14px; color: var(--text-muted);
+    }
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid var(--border-strong);
+      border-top-color: var(--text); border-radius: 50%;
+      animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Summary */
+    .summary-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px;
+    }
+    .summary-row:last-child { border-bottom: none; }
+    .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 2px; background: var(--green); transition: width .4s; }
+
+    /* Error */
+    .error-msg { font-size: 13px; color: #A32D2D; padding: .75rem 0; }
+
+    /* Tip */
+    .tip {
+      margin: 0 1rem .75rem; padding: .875rem 1rem;
+      background: #EAF3DE; border-radius: var(--radius);
+      font-size: 13px; color: #3B6D11; line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="app-header">
+    <div class="app-logo">Nutri<span>AI</span></div>
+  </div>
+
+  <div class="steps-nav">
+    <div class="step-dot active" id="dot0"></div>
+    <div class="step-dot" id="dot1"></div>
+    <div class="step-dot" id="dot2"></div>
+  </div>
+
+  <!-- STEP 0: Profilo -->
+  <div class="step active" id="step0">
+    <div class="step-header">
+      <div class="step-eyebrow">Passo 1 di 3</div>
+      <div class="step-title">Il tuo profilo</div>
+      <div class="step-sub">Calcoliamo il tuo fabbisogno reale</div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Sesso biologico</span>
+      <div class="seg" id="sexSeg">
+        <button class="seg-btn on" onclick="setSex('M',this)">Uomo</button>
+        <button class="seg-btn" onclick="setSex('F',this)">Donna</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Età</span>
+      <div class="slider-row">
+        <input type="range" id="age" min="16" max="80" value="28" step="1" oninput="sync(this,'ageV','anni');recalc()">
+        <span class="slider-val" id="ageV">28 anni</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Peso corporeo</span>
+      <div class="slider-row">
+        <input type="range" id="weight" min="40" max="160" value="75" step="1" oninput="sync(this,'weightV','kg');recalc()">
+        <span class="slider-val" id="weightV">75 kg</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Altezza</span>
+      <div class="slider-row">
+        <input type="range" id="height" min="140" max="215" value="175" step="1" oninput="sync(this,'heightV','cm');recalc()">
+        <span class="slider-val" id="heightV">175 cm</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Livello di attività fisica</span>
+      <div class="seg" id="actSeg">
+        <button class="seg-btn on" data-act="1.2" onclick="setAct(this)">Sed.</button>
+        <button class="seg-btn" data-act="1.375" onclick="setAct(this)">Leggero</button>
+        <button class="seg-btn" data-act="1.55" onclick="setAct(this)">Moderato</button>
+        <button class="seg-btn" data-act="1.725" onclick="setAct(this)">Intenso</button>
+      </div>
+    </div>
+
+    <div class="card surface">
+      <div class="kcal-display">
+        <div class="kcal-lbl">Fabbisogno giornaliero stimato (TDEE)</div>
+        <div class="kcal-num" id="tdeeNum">2.180</div>
+        <div class="kcal-lbl">kcal / giorno</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="goStep(1)">Continua →</button>
+  </div>
+
+  <!-- STEP 1: Obiettivo -->
+  <div class="step" id="step1">
+    <div class="step-header">
+      <div class="step-eyebrow">Passo 2 di 3</div>
+      <div class="step-title">Obiettivo & preferenze</div>
+      <div class="step-sub">Configura il tuo piano alimentare</div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Calorie target — deficit -20% consigliato</span>
+      <div class="slider-row">
+        <input type="range" id="tkcal" min="1200" max="4000" value="1750" step="50" oninput="sync(this,'tkcalV','kcal');updateMacros()">
+        <span class="slider-val" id="tkcalV">1.750 kcal</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Proteine — g per kg di peso corporeo</span>
+      <div class="slider-row">
+        <input type="range" id="prot" min="1.2" max="2.5" value="1.8" step="0.1" oninput="sync(this,'protV','g/kg');updateMacros()">
+        <span class="slider-val" id="protV">1.8 g/kg</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Tipo di dieta</span>
+      <div class="tags" id="dietTags">
+        <button class="tag on" data-diet="bilanciata" onclick="setDiet(this)">Bilanciata</button>
+        <button class="tag" data-diet="low carb" onclick="setDiet(this)">Low carb</button>
+        <button class="tag" data-diet="vegetariana" onclick="setDiet(this)">Vegetariana</button>
+        <button class="tag" data-diet="vegana" onclick="setDiet(this)">Vegana</button>
+        <button class="tag" data-diet="mediterranea" onclick="setDiet(this)">Mediterranea</button>
+        <button class="tag" data-diet="alta proteina" onclick="setDiet(this)">Alta proteina</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Pasti della giornata</span>
+      <div class="tags" id="mealTags">
+        <button class="tag on" data-meal="colazione" onclick="toggleMeal(this)">Colazione</button>
+        <button class="tag on" data-meal="pranzo" onclick="toggleMeal(this)">Pranzo</button>
+        <button class="tag on" data-meal="spuntino" onclick="toggleMeal(this)">Spuntino</button>
+        <button class="tag on" data-meal="cena" onclick="toggleMeal(this)">Cena</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Budget giornaliero spesa</span>
+      <div class="slider-row">
+        <input type="range" id="budget" min="3" max="30" value="10" step="1" oninput="sync(this,'budgetV','€/giorno')">
+        <span class="slider-val" id="budgetV">10 €/giorno</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Allergie o intolleranze (opzionale)</span>
+      <input type="text" id="allergies" placeholder="es. glutine, latticini, frutta a guscio...">
+    </div>
+
+    <div class="card surface">
+      <div class="macro-grid">
+        <div class="mc">
+          <div class="mc-label">Proteine</div>
+          <div class="mc-num" id="mpv" style="color:#1D9E75">135</div>
+          <div class="mc-unit">g</div>
+        </div>
+        <div class="mc">
+          <div class="mc-label">Carboidrati</div>
+          <div class="mc-num" id="mcv" style="color:#378ADD">175</div>
+          <div class="mc-unit">g</div>
+        </div>
+        <div class="mc">
+          <div class="mc-label">Grassi</div>
+          <div class="mc-num" id="mfv" style="color:#D85A30">54</div>
+          <div class="mc-unit">g</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="genBtn" onclick="generatePlan()">Genera piano ✦</button>
+    <button class="btn-secondary" onclick="goStep(0)">← Indietro</button>
+  </div>
+
+  <!-- STEP 2: Piano -->
+  <div class="step" id="step2">
+    <div class="step-header">
+      <div class="step-eyebrow">Il tuo piano</div>
+      <div class="step-title" id="planTitle">Piano giornaliero</div>
+      <div class="step-sub" id="planSub"></div>
+    </div>
+
+    <div class="tip" id="planTip">Tocca una ricetta per ogni pasto per selezionarla e vedere gli ingredienti.</div>
+
+    <div id="planBody"></div>
+    <div id="planSummary"></div>
+
+    <button class="btn-secondary" style="margin-top:1rem" onclick="goStep(1)">← Modifica e rigenera</button>
+  </div>
+</div>
+
+<script>
+const S = { sex: 'M', act: 1.2, diet: 'bilanciata', meals: ['colazione','pranzo','spuntino','cena'], tdee: 2180 };
+const mealColors = { colazione: '#EF9F27', pranzo: '#1D9E75', spuntino: '#378ADD', cena: '#D85A30' };
+const mealWeights = { colazione: .2, pranzo: .35, spuntino: .1, cena: .35 };
+
+function sync(el, outId, unit) {
+  const v = parseFloat(el.value);
+  const d = Number.isInteger(v) ? v.toLocaleString('it-IT') : v.toFixed(1);
+  document.getElementById(outId).textContent = d + ' ' + unit;
+}
+function setSex(s, btn) {
+  S.sex = s;
+  document.querySelectorAll('#sexSeg .seg-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on'); recalc();
+}
+function setAct(btn) {
+  S.act = parseFloat(btn.dataset.act);
+  document.querySelectorAll('#actSeg .seg-btn').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on'); recalc();
+}
+function setDiet(btn) {
+  S.diet = btn.dataset.diet;
+  document.querySelectorAll('#dietTags .tag').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on'); updateMacros();
+}
+function toggleMeal(btn) {
+  const m = btn.dataset.meal;
+  btn.classList.toggle('on');
+  if (btn.classList.contains('on')) { if (!S.meals.includes(m)) S.meals.push(m); }
+  else S.meals = S.meals.filter(x => x !== m);
+}
+function recalc() {
+  const age = +document.getElementById('age').value;
+  const w = +document.getElementById('weight').value;
+  const h = +document.getElementById('height').value;
+  let bmr = S.sex === 'M' ? 88.36 + (13.4*w) + (4.8*h) - (5.7*age) : 447.6 + (9.2*w) + (3.1*h) - (4.3*age);
+  S.tdee = Math.round(bmr * S.act);
+  document.getElementById('tdeeNum').textContent = S.tdee.toLocaleString('it-IT');
+  const def = Math.min(4000, Math.max(1200, Math.round(S.tdee * 0.8 / 50) * 50));
+  document.getElementById('tkcal').value = def;
+  sync(document.getElementById('tkcal'), 'tkcalV', 'kcal');
+  updateMacros();
+}
+function updateMacros() {
+  const kcal = +document.getElementById('tkcal').value;
+  const ratio = +document.getElementById('prot').value;
+  const w = +document.getElementById('weight').value;
+  const p = Math.round(w * ratio);
+  const fkcal = kcal * (S.diet === 'low carb' ? 0.45 : 0.28);
+  const f = Math.round(fkcal / 9);
+  const c = Math.round(Math.max(0, kcal - p*4 - fkcal) / 4);
+  document.getElementById('mpv').textContent = p;
+  document.getElementById('mcv').textContent = c;
+  document.getElementById('mfv').textContent = f;
+  S.macros = { kcal, p, c, f };
+}
+function goStep(n) {
+  ['step0','step1','step2'].forEach((id,i) => document.getElementById(id).classList.toggle('active', i === n));
+  ['dot0','dot1','dot2'].forEach((id,i) => document.getElementById(id).classList.toggle('active', i <= n));
+  window.scrollTo(0, 0);
+}
+
+async function generatePlan() {
+  if (S.meals.length === 0) { alert('Seleziona almeno un pasto'); return; }
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true; btn.textContent = 'Generazione in corso...';
+  goStep(2);
+
+  const { kcal, p, c, f } = S.macros;
+  document.getElementById('planTitle').textContent = `Piano ${S.diet}`;
+  document.getElementById('planSub').textContent = `${kcal.toLocaleString('it-IT')} kcal · P${p}g C${c}g G${f}g`;
+
+  const totalW = S.meals.reduce((s, m) => s + (mealWeights[m] || 0.2), 0);
+  const mkcal = {};
+  S.meals.forEach(m => { mkcal[m] = Math.round(kcal * (mealWeights[m] || 0.2) / totalW); });
+
+  const body = document.getElementById('planBody');
+  document.getElementById('planSummary').innerHTML = '';
+  body.innerHTML = S.meals.map(m => `
+    <div class="meal-section" id="ms_${m}">
+      <div class="meal-header">
+        <span class="meal-dot" style="background:${mealColors[m]}"></span>
+        ${m.charAt(0).toUpperCase()+m.slice(1)}
+        <span class="meal-kcal">${mkcal[m]} kcal</span>
+      </div>
+      <div class="loading-row"><div class="spinner"></div> Generazione ricette...</div>
+    </div>`).join('');
+
+  try {
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sesso: S.sex, tdee: S.tdee,
+        kcal, proteine: p, carboidrati: c, grassi: f,
+        dieta: S.diet, pasti: S.meals,
+        budget: +document.getElementById('budget').value,
+        allergie: document.getElementById('allergies').value.trim() || 'nessuna'
+      })
+    });
+    if (!res.ok) throw new Error('API error ' + res.status);
+    const data = await res.json();
+    S.meals.forEach(m => renderMeal(m, data.pasti?.[m], mkcal[m]));
+    renderSummary();
+  } catch (e) {
+    body.innerHTML = `<div style="margin:0 1rem"><div class="error-msg">Errore nella generazione del piano. Riprova.</div></div>`;
+  }
+  btn.disabled = false; btn.textContent = 'Genera piano ✦';
+}
+
+function renderMeal(meal, ricette, targetKcal) {
+  const sec = document.getElementById('ms_' + meal);
+  if (!ricette || !ricette.length) {
+    sec.innerHTML = `<div class="meal-header"><span class="meal-dot" style="background:${mealColors[meal]}"></span>${meal}</div><div class="error-msg">Nessuna ricetta disponibile</div>`;
+    return;
+  }
+  sec.innerHTML = `
+    <div class="meal-header">
+      <span class="meal-dot" style="background:${mealColors[meal]}"></span>
+      ${meal.charAt(0).toUpperCase()+meal.slice(1)}
+      <span class="meal-kcal">${targetKcal} kcal</span>
+    </div>
+    ${ricette.map((r,i) => `
+      <div class="recipe" id="rc_${meal}_${i}" onclick="selRec('${meal}',${i})">
+        <div class="recipe-name">${r.nome||'Ricetta '+(i+1)}</div>
+        <div class="recipe-meta">P ${r.p||0}g · C ${r.c||0}g · G ${r.f||0}g · ${r.min||15} min</div>
+        <div class="recipe-kcal">${r.kcal||0} kcal</div>
+        <div class="recipe-detail">
+          <strong>Ingredienti:</strong> ${r.ingredienti||''}<br><br>
+          <strong>Preparazione:</strong> ${r.preparazione||''}
+        </div>
+      </div>`).join('')}`;
+  window['_r_'+meal] = ricette;
+}
+
+function selRec(meal, idx) {
+  document.querySelectorAll(`[id^="rc_${meal}_"]`).forEach(c => c.classList.remove('selected'));
+  document.getElementById(`rc_${meal}_${idx}`).classList.add('selected');
+  S['sel_'+meal] = (window['_r_'+meal]||[])[idx];
+  updateSummary();
+}
+
+function updateSummary() {
+  let tp=0, tc=0, tf=0, tkcal=0, count=0;
+  S.meals.forEach(m => {
+    const r = S['sel_'+m];
+    if (r) { tp+=r.p||0; tc+=r.c||0; tf+=r.f||0; tkcal+=r.kcal||0; count++; }
+  });
+  if (!count) return;
+  const pct = v => Math.min(100, Math.round(v / S.macros.kcal * 100));
+  document.getElementById('planSummary').innerHTML = `
+    <div class="card" style="margin-top:.5rem">
+      <div class="summary-row" style="font-size:13px;color:#999;padding-top:0">
+        <span>${count} / ${S.meals.length} pasti selezionati</span>
+      </div>
+      <div class="summary-row">
+        <span>Calorie totali</span>
+        <span style="font-weight:600">${tkcal} / ${S.macros.kcal} kcal</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct(tkcal)}%"></div></div>
+      <div class="summary-row" style="margin-top:8px"><span>Proteine</span><span>${tp}g</span></div>
+      <div class="summary-row"><span>Carboidrati</span><span>${tc}g</span></div>
+      <div class="summary-row"><span>Grassi</span><span>${tf}g</span></div>
+    </div>`;
+}
+function renderSummary() {
+  document.getElementById('planSummary').innerHTML = `
+    <div class="card surface" style="margin-top:.5rem;font-size:13px;color:#999;text-align:center;padding:.875rem">
+      Seleziona una ricetta per ogni pasto per vedere il riepilogo
+    </div>`;
+}
+
+recalc();
+</script>
+</body>
+</html>
