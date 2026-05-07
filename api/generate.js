@@ -37,7 +37,9 @@ Rispondi SOLO con JSON valido, senza markdown, senza testo extra:
   }
 }`;
 
-  try {
+  if (!process.env.GROQ_API_KEY) {
+  return res.status(500).json({ error: 'GROQ_API_KEY non configurata' });
+}try {
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
